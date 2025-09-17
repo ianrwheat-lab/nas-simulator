@@ -33,12 +33,13 @@ class Aircraft:
 # Node Class
 # -----------------------------
 class Node:
-    def __init__(self, name, bead_threshold):
+    def __init__(self, name, bead_threshold, max_queue=None):
         self.name = name
         self.capacity = 0
         self.dice_rolls = []
         self.queue = deque()
         self.bead_threshold = bead_threshold
+        self.max_queue = max_queue  # New: Limit for Towers
 
     def roll_capacity(self, dice_count=1):
         self.dice_rolls = [random.randint(1, 6) for _ in range(dice_count)]
@@ -74,6 +75,14 @@ class Node:
 
                 if aircraft.route:
                     next_stop = aircraft.route[0]
+                    # New logic: If next node is a Tower and has queue limit
+                    if "Tower" in next_stop and node_map[next_stop].max_queue is not None:
+                        if len(node_map[next_stop].queue) >= node_map[next_stop].max_queue:
+                            # Can't move yet
+                            aircraft.beads = self.bead_threshold  # Hold until next time
+                            self.queue.appendleft(aircraft)
+                            continue
+
                     aircraft.location = next_stop
                     aircraft.status = "In System"
                     node_map[next_stop].queue.append(aircraft)
@@ -87,10 +96,14 @@ class Node:
 # -----------------------------
 def initialize_simulation():
     nodes = {
-        'Tower_A': Node('Tower_A', 3),
-        'Tower_B': Node('Tower_B', 3),
-        'Tower_C': Node('Tower_C', 3),
-        'Tower_D': Node('Tower_D', 3),
+        'Tower_A': Node('Tower_A', 3, max_queue=2),
+        'Tower_B': Node('Tower_B', 3, max_queue=2),
+        'Tower_C': Node('Tower_C', 3, max_queue=2),
+        'Tower_D': Node('Tower_D', 3, max_queue=2),
+        'PreTower_A': Node('PreTower_A', 0),
+        'PreTower_B': Node('PreTower_B', 0),
+        'PreTower_C': Node('PreTower_C', 0),
+        'PreTower_D': Node('PreTower_D', 0),
         'TRACON_N': Node('TRACON_N', 2),
         'TRACON_S': Node('TRACON_S', 2),
         'CENTER': Node('CENTER', 2),
@@ -102,15 +115,19 @@ def initialize_simulation():
     return nodes
 
 def generate_route(origin, destination):
+    pre_tower_origin = f"PreTower_{origin}"
     tower_origin = f"Tower_{origin}"
     tower_dest = f"Tower_{destination}"
+    pre_tower_dest = f"PreTower_{destination}"
+
     if origin in ['A', 'B']:
         tracon_out = "TRACON_S"
         tracon_in = "TRACON_N"
     else:
         tracon_out = "TRACON_N"
         tracon_in = "TRACON_S"
-    return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest, destination]
+
+    return [pre_tower_origin, tower_origin, tracon_out, "CENTER", tracon_in, pre_tower_dest, tower_dest, destination]
 
 def get_destination_from_roll(origin, roll):
     if origin in ['A', 'B']:
@@ -141,18 +158,18 @@ def run_substep():
     phase = st.session_state.phase
 
     if phase == 1:
-        # Roll all node capacities first
+        # Roll capacities
         for name, node in nodes.items():
             node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
 
-        # Spawn aircraft (only once per full step)
+        # Spawn aircraft from gate to PreTower
         for gate in ['A','B','C','D']:
             if nodes[gate].dice_rolls:
                 spawn_roll = nodes[gate].dice_rolls[0]
                 destination = get_destination_from_roll(gate, spawn_roll)
                 route = generate_route(gate, destination)
                 ac = Aircraft(aircraft_id, gate, destination, route, spawn_roll)
-                nodes[route[0]].queue.append(ac)
+                nodes[route[0]].queue.append(ac)  # PreTower
                 aircraft_list.append(ac)
                 aircraft_id += 1
 
@@ -165,21 +182,20 @@ def run_substep():
             node.move_ready_aircraft(nodes)
         st.session_state.step += 1
 
-    # Advance to next phase or reset
     st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
     st.session_state.aircraft_id = aircraft_id
 
 # -----------------------------
 # Streamlit UI
 # -----------------------------
-st.title("🛫 NAS Bead & Bowl Simulator - 3 Phase Mode")
+st.title("🛫 NAS Bead & Bowl Simulator - 3 Phase Mode with PreTower Hold")
 
 st.markdown("""
 Each turn now breaks into **three sub-steps**:
 
 1. **🎲 Roll Dice** for each node (and spawn aircraft)
 2. **💎 Distribute Beads** based on dice
-3. **✈️ Move Aircraft** to their next location
+3. **✈️ Move Aircraft** to their next location (PreTower to Tower allowed only if space)
 """)
 
 st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
