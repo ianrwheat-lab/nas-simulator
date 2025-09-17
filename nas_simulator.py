@@ -111,14 +111,8 @@ class Center:
                 moved += 1
 
 # -----------------------------
-# Simulation State
+# Initialization Function
 # -----------------------------
-if 'state' not in st.session_state:
-    st.session_state.gates, st.session_state.towers, st.session_state.tracons, st.session_state.center = initialize_simulation()
-    st.session_state.aircraft_list = []
-    st.session_state.aircraft_id = 1
-    st.session_state.step = 1
-
 def initialize_simulation():
     gates = {name: Gate(name) for name in ['A', 'B', 'C', 'D']}
     towers = {name: Tower(name) for name in ['A', 'B', 'C', 'D']}
@@ -128,6 +122,15 @@ def initialize_simulation():
     }
     center = Center()
     return gates, towers, tracons, center
+
+# -----------------------------
+# Simulation State
+# -----------------------------
+if 'gates' not in st.session_state:
+    st.session_state.gates, st.session_state.towers, st.session_state.tracons, st.session_state.center = initialize_simulation()
+    st.session_state.aircraft_list = []
+    st.session_state.aircraft_id = 1
+    st.session_state.step = 1
 
 # -----------------------------
 # Single Step Logic
