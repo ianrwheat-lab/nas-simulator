@@ -39,7 +39,7 @@ class Node:
         self.dice_rolls = []
         self.queue = deque()
         self.bead_threshold = bead_threshold
-        self.max_queue = max_queue  # New: Limit for Towers
+        self.max_queue = max_queue  # For Towers: cap their queue length
 
     def roll_capacity(self, dice_count=1):
         self.dice_rolls = [random.randint(1, 6) for _ in range(dice_count)]
@@ -66,47 +66,97 @@ class Node:
                 aircraft.status = "Ready to Move"
 
     def move_ready_aircraft(self, node_map):
-        for aircraft in list(self.queue):
-            if aircraft.status == "Ready to Move":
-                self.queue.remove(aircraft)
-                aircraft.beads = 0
-                if aircraft.route:
-                    aircraft.route.pop(0)
+        if not self.queue:
+            return
 
-                if aircraft.route:
-                    next_stop = aircraft.route[0]
-                    # New logic: If next node is a Tower and has queue limit
-                    if "Tower" in next_stop and node_map[next_stop].max_queue is not None:
-                        if len(node_map[next_stop].queue) >= node_map[next_stop].max_queue:
-                            # Can't move yet
-                            aircraft.beads = self.bead_threshold  # Hold until next time
-                            self.queue.appendleft(aircraft)
-                            continue
+        # Snapshot of ready aircraft (avoid churn while iterating)
+        ready = [ac for ac in list(self.queue) if ac.status == "Ready to Move"]
 
-                    aircraft.location = next_stop
-                    aircraft.status = "In System"
-                    node_map[next_stop].queue.append(aircraft)
+        for aircraft in ready:
+            # Must have a route and current node should match
+            if not aircraft.route or aircraft.route[0] != self.name:
+                continue
+
+            # --- Special handling for PreTower_* nodes ---
+            if self.name.startswith("PreTower_"):
+                # Expect the next hop to be the matched Tower_* (route[1])
+                if len(aircraft.route) < 2:
+                    continue  # nowhere to go
+
+                next_stop = aircraft.route[1]
+
+                # PreTower should only feed Tower; enforce capacity
+                if next_stop.startswith("Tower_"):
+                    tower_node = node_map[next_stop]
+                    max_q = tower_node.max_queue if tower_node.max_queue is not None else float("inf")
+                    if len(tower_node.queue) < max_q:
+                        # Move into Tower now (only now pop route)
+                        self.queue.remove(aircraft)
+                        aircraft.beads = 0
+                        aircraft.route.pop(0)  # remove current PreTower_*
+                        aircraft.location = next_stop
+                        aircraft.status = "In System"
+                        tower_node.queue.append(aircraft)
+                    else:
+                        # Tower full → hold in PreTower (do not pop route)
+                        continue
                 else:
+                    # Defensive: PreTower should only feed a Tower
+                    continue
+
+            # --- General case for all other nodes ---
+            else:
+                # If there's no next hop, we're effectively arriving
+                if len(aircraft.route) < 2:
+                    self.queue.remove(aircraft)
+                    aircraft.beads = 0
+                    aircraft.route.pop(0)  # remove current node
                     aircraft.location = aircraft.destination
                     aircraft.status = "Arrived"
                     node_map[aircraft.destination].queue.append(aircraft)
+                    continue
+
+                next_stop = aircraft.route[1]
+
+                # If next is a Tower with a queue cap, enforce it
+                if next_stop.startswith("Tower_"):
+                    tower_node = node_map[next_stop]
+                    max_q = tower_node.max_queue if tower_node.max_queue is not None else float("inf")
+                    if len(tower_node.queue) >= max_q:
+                        # Blocked by Tower capacity → hold here; do not pop route
+                        continue
+
+                # Move forward (now safe to pop)
+                self.queue.remove(aircraft)
+                aircraft.beads = 0
+                aircraft.route.pop(0)  # remove current node
+                aircraft.location = next_stop
+                aircraft.status = "In System"
+                node_map[next_stop].queue.append(aircraft)
 
 # -----------------------------
 # Initialization
 # -----------------------------
 def initialize_simulation():
     nodes = {
-        'Tower_A': Node('Tower_A', 3, max_queue=3),
-        'Tower_B': Node('Tower_B', 3, max_queue=3),
-        'Tower_C': Node('Tower_C', 3, max_queue=3),
-        'Tower_D': Node('Tower_D', 3, max_queue=3),
+        # Towers: bead_threshold=3, queue cap=2
+        'Tower_A': Node('Tower_A', 3, max_queue=2),
+        'Tower_B': Node('Tower_B', 3, max_queue=2),
+        'Tower_C': Node('Tower_C', 3, max_queue=2),
+        'Tower_D': Node('Tower_D', 3, max_queue=2),
+
+        # PreTower holding queues (FIFO, no beads, uncapped)
         'PreTower_A': Node('PreTower_A', 0),
         'PreTower_B': Node('PreTower_B', 0),
         'PreTower_C': Node('PreTower_C', 0),
         'PreTower_D': Node('PreTower_D', 0),
+
+        # Enroute facilities
         'TRACON_N': Node('TRACON_N', 2),
         'TRACON_S': Node('TRACON_S', 2),
         'CENTER': Node('CENTER', 2),
+
+        # Gates (used for spawning & final arrival only)
         'A': Node('A', 0),
         'B': Node('B', 0),
         'C': Node('C', 0),
@@ -127,6 +177,8 @@ def generate_route(origin, destination):
         tracon_out = "TRACON_N"
         tracon_in = "TRACON_S"
 
+    # Gate → PreTower(origin) → Tower(origin) → TRACON_out → CENTER → TRACON_in
+    # → PreTower(dest) → Tower(dest) → Gate(dest)
     return [pre_tower_origin, tower_origin, tracon_out, "CENTER", tracon_in, pre_tower_dest, tower_dest, destination]
 
 def get_destination_from_roll(origin, roll):
@@ -162,52 +214,69 @@ def run_substep():
         for name, node in nodes.items():
             node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
 
-        # Spawn aircraft from gate to PreTower
+        # Spawn aircraft from Gate to PreTower
         for gate in ['A','B','C','D']:
             if nodes[gate].dice_rolls:
                 spawn_roll = nodes[gate].dice_rolls[0]
                 destination = get_destination_from_roll(gate, spawn_roll)
                 route = generate_route(gate, destination)
                 ac = Aircraft(aircraft_id, gate, destination, route, spawn_roll)
-                nodes[route[0]].queue.append(ac)  # PreTower
+                nodes[route[0]].queue.append(ac)  # into PreTower_*
                 aircraft_list.append(ac)
                 aircraft_id += 1
 
     elif phase == 2:
+        # Assign beads everywhere (PreTower bead_threshold=0 -> Ready each cycle)
         for node in nodes.values():
             node.assign_beads()
 
     elif phase == 3:
-        for node in nodes.values():
-            node.move_ready_aircraft(nodes)
+        # Two-pass move: free capacity first, then let PreTowers feed Towers
+        # Pass 1: move everything except PreTower_*
+        for name, node in nodes.items():
+            if not name.startswith("PreTower_"):
+                node.move_ready_aircraft(nodes)
+
+        # Pass 2: now move PreTower_* into Towers if space opened
+        for name, node in nodes.items():
+            if name.startswith("PreTower_"):
+                node.move_ready_aircraft(nodes)
+
         st.session_state.step += 1
 
+    # Advance phase
     st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
     st.session_state.aircraft_id = aircraft_id
 
 # -----------------------------
 # Streamlit UI
 # -----------------------------
-st.title("🛫 NAS Bead & Bowl Simulator - 3 Phase Mode with PreTower Hold")
+st.title("🛫 NAS Bead & Bowl Simulator — PreTower Hold & Tower Cap")
 
 st.markdown("""
-Each turn now breaks into **three sub-steps**:
-
+**Three sub-steps per turn:**
 1. **🎲 Roll Dice** for each node (and spawn aircraft)
 2. **💎 Distribute Beads** based on dice
-3. **✈️ Move Aircraft** to their next location (PreTower to Tower allowed only if space)
+3. **✈️ Move Aircraft** (PreTowers only release to Towers if Towers have space)
 """)
 
 st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
 
-if st.button("Run Next Sub-Step"):
-    run_substep()
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Run Next Sub-Step"):
+        run_substep()
+with col2:
+    if st.button("🔁 Reset Simulation"):
+        st.session_state.clear()
+        st.experimental_rerun()
 
+# Aircraft table
 results = [ac.to_dict() for ac in st.session_state.aircraft_list]
 df = pd.DataFrame(results)
 st.dataframe(df, use_container_width=True)
 
-# New table: aircraft counts and dice rolls by node
+# Node status table
 node_status = []
 for name, node in st.session_state.nodes.items():
     node_status.append({
@@ -219,4 +288,3 @@ for name, node in st.session_state.nodes.items():
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
-
