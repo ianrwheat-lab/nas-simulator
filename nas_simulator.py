@@ -34,11 +34,13 @@ class Node:
     def __init__(self, name, bead_threshold):
         self.name = name
         self.capacity = 0
+        self.dice_rolls = []
         self.queue = deque()
         self.bead_threshold = bead_threshold
 
     def roll_capacity(self, dice_count=1):
-        self.capacity = sum(random.randint(1, 6) for _ in range(dice_count))
+        self.dice_rolls = [random.randint(1, 6) for _ in range(dice_count)]
+        self.capacity = sum(self.dice_rolls)
 
     def assign_beads(self):
         for aircraft in list(self.queue):
@@ -166,3 +168,16 @@ if st.button("Run Next Sub-Step"):
 results = [ac.to_dict() for ac in st.session_state.aircraft_list]
 df = pd.DataFrame(results)
 st.dataframe(df, use_container_width=True)
+
+# New table: aircraft counts and dice rolls by node
+node_status = []
+for name, node in st.session_state.nodes.items():
+    node_status.append({
+        "Node": name,
+        "Aircraft Count": len(node.queue),
+        "Dice Roll(s)": node.dice_rolls,
+        "Total Capacity": node.capacity
+    })
+
+st.markdown("### 📊 Node Status Overview")
+st.dataframe(pd.DataFrame(node_status), use_container_width=True)
