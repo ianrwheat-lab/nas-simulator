@@ -43,10 +43,26 @@ class Node:
         self.capacity = sum(self.dice_rolls)
 
     def assign_beads(self):
-        for aircraft in list(self.queue):
-            while aircraft.beads < self.bead_threshold and self.capacity > 0:
-                aircraft.beads += 1
-                self.capacity -= 1
+        if not self.queue:
+            return
+
+        total_aircraft = len(self.queue)
+        distributed = 0
+
+        while self.capacity > 0:
+            all_filled = True
+            for aircraft in self.queue:
+                if aircraft.beads < self.bead_threshold:
+                    aircraft.beads += 1
+                    self.capacity -= 1
+                    distributed += 1
+                    all_filled = False
+                    if self.capacity == 0:
+                        break
+            if all_filled:
+                break
+
+        for aircraft in self.queue:
             if aircraft.beads >= self.bead_threshold:
                 aircraft.status = "Ready to Move"
 
