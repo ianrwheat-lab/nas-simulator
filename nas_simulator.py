@@ -11,8 +11,8 @@ class Aircraft:
         self.id = id
         self.origin = origin
         self.destination = destination
-        self.route = route  # List of stages to pass through
-        self.location = route[0]  # Start at first location in route
+        self.route = route
+        self.location = route[0]
         self.beads = 0
         self.status = "In System"
 
@@ -28,7 +28,7 @@ class Aircraft:
         }
 
 # -----------------------------
-# Entity Classes
+# Node Class
 # -----------------------------
 class Node:
     def __init__(self, name, bead_threshold):
@@ -78,9 +78,6 @@ def initialize_simulation():
     }
     return nodes
 
-# -----------------------------
-# Routing Logic
-# -----------------------------
 def generate_route(origin, destination):
     tower_origin = f"Tower_{origin}"
     tower_dest = f"Tower_{destination}"
@@ -93,59 +90,71 @@ def generate_route(origin, destination):
     return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest]
 
 # -----------------------------
-# Simulation State
+# Streamlit State Initialization
 # -----------------------------
 if 'nodes' not in st.session_state:
     st.session_state.nodes = initialize_simulation()
     st.session_state.aircraft_list = []
     st.session_state.aircraft_id = 1
     st.session_state.step = 1
+    st.session_state.phase = 1  # 1 = Roll, 2 = Beads, 3 = Move
 
 # -----------------------------
-# Turn Logic
+# Sub-Step Execution
 # -----------------------------
-def run_step():
+def run_substep():
     nodes = st.session_state.nodes
     aircraft_list = st.session_state.aircraft_list
     aircraft_id = st.session_state.aircraft_id
     step = st.session_state.step
+    phase = st.session_state.phase
 
-    spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
+    if phase == 1:
+        # Spawn aircraft (only once per full step)
+        spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
+        for gate in spawn_gates:
+            roll = random.randint(1, 6)
+            destination = 'C' if roll <= 3 else 'D' if gate in ['A', 'B'] else 'A' if roll <= 3 else 'B'
+            route = generate_route(gate, destination)
+            ac = Aircraft(aircraft_id, gate, destination, route)
+            nodes[route[0]].queue.append(ac)
+            aircraft_list.append(ac)
+            aircraft_id += 1
 
-    for gate in spawn_gates:
-        roll = random.randint(1, 6)
-        destination = 'C' if roll <= 3 else 'D' if gate in ['A', 'B'] else 'A' if roll <= 3 else 'B'
-        route = generate_route(gate, destination)
-        ac = Aircraft(aircraft_id, gate, destination, route)
-        nodes[route[0]].queue.append(ac)
-        aircraft_list.append(ac)
-        aircraft_id += 1
+        # Roll all node capacities
+        for name, node in nodes.items():
+            node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
 
-    # Roll capacity and move aircraft through all nodes
-    for name, node in nodes.items():
-        node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
-        node.assign_beads()
-        node.move_ready_aircraft(nodes)
+    elif phase == 2:
+        for node in nodes.values():
+            node.assign_beads()
 
+    elif phase == 3:
+        for node in nodes.values():
+            node.move_ready_aircraft(nodes)
+        st.session_state.step += 1
+
+    # Advance to next phase or reset
+    st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
     st.session_state.aircraft_id = aircraft_id
-    st.session_state.step += 1
 
 # -----------------------------
-# Streamlit App
+# Streamlit UI
 # -----------------------------
-st.title("🛫 NAS Bead & Bowl Simulator - Gate to Gate")
+st.title("🛫 NAS Bead & Bowl Simulator - 3 Phase Mode")
 
 st.markdown("""
-Each aircraft now routes from **origin gate** to **destination gate**:
+Each turn now breaks into **three sub-steps**:
 
-- **Towers** need 3 beads
-- **TRACONs/CENTER** need 2 beads
-- Routing: `Tower → TRACON → CENTER → TRACON → Tower → Gate`
-- Direction determined by dice roll at spawn
+1. **🎲 Roll Dice** for each node (and spawn aircraft)
+2. **💎 Distribute Beads** based on dice
+3. **✈️ Move Aircraft** to their next location
 """)
 
-if st.button("Run One Step"):
-    run_step()
+st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
+
+if st.button("Run Next Sub-Step"):
+    run_substep()
 
 results = [ac.to_dict() for ac in st.session_state.aircraft_list]
 df = pd.DataFrame(results)
