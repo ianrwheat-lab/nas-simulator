@@ -41,11 +41,15 @@ class Node:
         self.bead_threshold = bead_threshold
 
     def roll_capacity(self, dice_count=1):
-        self.dice_rolls = [random.randint(1, 6) for _ in range(dice_count)]
-        self.capacity = sum(self.dice_rolls)
+        if self.bead_threshold > 0:  # Only roll for nodes that assign beads
+            self.dice_rolls = [random.randint(1, 6) for _ in range(dice_count)]
+            self.capacity = sum(self.dice_rolls)
+        else:
+            self.dice_rolls = []
+            self.capacity = 0
 
     def assign_beads(self):
-        if not self.queue:
+        if not self.queue or self.bead_threshold == 0:
             return
 
         while self.capacity > 0:
@@ -76,7 +80,16 @@ class Node:
                     next_stop = aircraft.route[0]
                     aircraft.location = next_stop
                     aircraft.status = "In System"
-                    node_map[next_stop].queue.append(aircraft)
+
+                    # Add holding logic for towers
+                    if next_stop.startswith("Tower_") and not "Holding" in next_stop:
+                        if len(node_map[next_stop].queue) >= 2:
+                            holding_node = f"{next_stop}_Holding"
+                            node_map[holding_node].queue.append(aircraft)
+                        else:
+                            node_map[next_stop].queue.append(aircraft)
+                    else:
+                        node_map[next_stop].queue.append(aircraft)
                 else:
                     aircraft.location = aircraft.destination
                     aircraft.status = "Arrived"
@@ -91,6 +104,10 @@ def initialize_simulation():
         'Tower_B': Node('Tower_B', 3),
         'Tower_C': Node('Tower_C', 3),
         'Tower_D': Node('Tower_D', 3),
+        'Tower_A_Holding': Node('Tower_A_Holding', 0),
+        'Tower_B_Holding': Node('Tower_B_Holding', 0),
+        'Tower_C_Holding': Node('Tower_C_Holding', 0),
+        'Tower_D_Holding': Node('Tower_D_Holding', 0),
         'TRACON_N': Node('TRACON_N', 2),
         'TRACON_S': Node('TRACON_S', 2),
         'CENTER': Node('CENTER', 2),
@@ -128,7 +145,7 @@ if 'nodes' not in st.session_state:
     st.session_state.aircraft_list = []
     st.session_state.aircraft_id = 1
     st.session_state.step = 1
-    st.session_state.phase = 1  # 1 = Roll, 2 = Beads, 3 = Move
+    st.session_state.phase = 1
 
 # -----------------------------
 # Sub-Step Execution
@@ -141,11 +158,10 @@ def run_substep():
     phase = st.session_state.phase
 
     if phase == 1:
-        # Roll all node capacities first
         for name, node in nodes.items():
-            node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
+            dice_count = 2 if 'TRACON' in name or name == 'CENTER' else 1
+            node.roll_capacity(dice_count)
 
-        # Spawn aircraft (only once per full step)
         for gate in ['A','B','C','D']:
             if nodes[gate].dice_rolls:
                 spawn_roll = nodes[gate].dice_rolls[0]
@@ -163,9 +179,17 @@ def run_substep():
     elif phase == 3:
         for node in nodes.values():
             node.move_ready_aircraft(nodes)
+
+        # Move one aircraft from each holding to tower if space
+        for tower in ['Tower_A', 'Tower_B', 'Tower_C', 'Tower_D']:
+            holding = f"{tower}_Holding"
+            if len(nodes[tower].queue) < 2 and nodes[holding].queue:
+                aircraft = nodes[holding].queue.popleft()
+                aircraft.location = tower
+                nodes[tower].queue.append(aircraft)
+
         st.session_state.step += 1
 
-    # Advance to next phase or reset
     st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
     st.session_state.aircraft_id = aircraft_id
 
@@ -191,7 +215,6 @@ results = [ac.to_dict() for ac in st.session_state.aircraft_list]
 df = pd.DataFrame(results)
 st.dataframe(df, use_container_width=True)
 
-# New table: aircraft counts and dice rolls by node
 node_status = []
 for name, node in st.session_state.nodes.items():
     node_status.append({
