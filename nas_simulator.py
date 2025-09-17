@@ -38,6 +38,7 @@ class Node:
         self.capacity = 0
         self.dice_rolls = []
         self.queue = deque()
+        self.holding_queue = deque() if "Tower" in name else None
         self.bead_threshold = bead_threshold
 
     def roll_capacity(self, dice_count=1):
@@ -76,11 +77,26 @@ class Node:
                     next_stop = aircraft.route[0]
                     aircraft.location = next_stop
                     aircraft.status = "In System"
-                    node_map[next_stop].queue.append(aircraft)
+
+                    # Tower logic: if next node is a tower and it's full, use holding queue
+                    if "Tower" in next_stop:
+                        tower_node = node_map[next_stop]
+                        if len(tower_node.queue) >= 2:
+                            tower_node.holding_queue.append(aircraft)
+                        else:
+                            tower_node.queue.append(aircraft)
+                    else:
+                        node_map[next_stop].queue.append(aircraft)
                 else:
                     aircraft.location = aircraft.destination
                     aircraft.status = "Arrived"
                     node_map[aircraft.destination].queue.append(aircraft)
+
+    def pull_from_holding(self):
+        if self.holding_queue:
+            while self.holding_queue and len(self.queue) < 2:
+                aircraft = self.holding_queue.popleft()
+                self.queue.append(aircraft)
 
 # -----------------------------
 # Initialization
@@ -141,12 +157,10 @@ def run_substep():
     phase = st.session_state.phase
 
     if phase == 1:
-        # Roll all node capacities first
         for name, node in nodes.items():
             node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
 
-        # Spawn aircraft (only once per full step)
-        for gate in ['A','B','C','D']:
+        for gate in ['A', 'B', 'C', 'D']:
             if nodes[gate].dice_rolls:
                 spawn_roll = nodes[gate].dice_rolls[0]
                 destination = get_destination_from_roll(gate, spawn_roll)
@@ -163,9 +177,10 @@ def run_substep():
     elif phase == 3:
         for node in nodes.values():
             node.move_ready_aircraft(nodes)
+        for node in nodes.values():
+            node.pull_from_holding()
         st.session_state.step += 1
 
-    # Advance to next phase or reset
     st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
     st.session_state.aircraft_id = aircraft_id
 
@@ -175,11 +190,10 @@ def run_substep():
 st.title("🛫 NAS Bead & Bowl Simulator - 3 Phase Mode")
 
 st.markdown("""
-Each turn now breaks into **three sub-steps**:
-
-1. **🎲 Roll Dice** for each node (and spawn aircraft)
-2. **💎 Distribute Beads** based on dice
-3. **✈️ Move Aircraft** to their next location
+Each turn breaks into **three sub-steps**:
+1. **🎲 Roll Dice** (and spawn aircraft)
+2. **💎 Distribute Beads**
+3. **✈️ Move Aircraft** (with Tower holding queue enforcement)
 """)
 
 st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
@@ -191,16 +205,15 @@ results = [ac.to_dict() for ac in st.session_state.aircraft_list]
 df = pd.DataFrame(results)
 st.dataframe(df, use_container_width=True)
 
-# New table: aircraft counts and dice rolls by node
 node_status = []
 for name, node in st.session_state.nodes.items():
     node_status.append({
         "Node": name,
         "Aircraft Count": len(node.queue),
+        "Holding Queue Count": len(node.holding_queue) if node.holding_queue else None,
         "Dice Roll(s)": node.dice_rolls,
         "Total Capacity": node.capacity
     })
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
-
