@@ -64,7 +64,6 @@ class Node:
                 else:
                     aircraft.location = aircraft.destination
                     aircraft.status = "Arrived"
-                    node_map[f"Gate_{aircraft.destination}"].queue.append(aircraft)
 
 # -----------------------------
 # Initialization
