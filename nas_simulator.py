@@ -146,8 +146,7 @@ def run_substep():
             node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
 
         # Spawn aircraft (only once per full step)
-        spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
-        for gate in spawn_gates:
+        for gate in ['A','B','C','D']:
             if nodes[gate].dice_rolls:
                 spawn_roll = nodes[gate].dice_rolls[0]
                 destination = get_destination_from_roll(gate, spawn_roll)
@@ -204,3 +203,4 @@ for name, node in st.session_state.nodes.items():
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
