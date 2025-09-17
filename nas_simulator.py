@@ -157,3 +157,164 @@ def initialize_simulation():
         'Tower_B': Node('Tower_B', 3, max_queue=2),
         'Tower_C': Node('Tower_C', 3, max_queue=2),
         'Tower_D': Node('Tower_D', 3, max_queue=2),
+
+        # PreTower holding queues (FIFO, no beads, uncapped)
+        # Arrivals (from TRACON_in) and Departures (from Gate)
+        'PreTowerArr_A': Node('PreTowerArr_A', 0),
+        'PreTowerDep_A': Node('PreTowerDep_A', 0),
+        'PreTowerArr_B': Node('PreTowerArr_B', 0),
+        'PreTowerDep_B': Node('PreTowerDep_B', 0),
+        'PreTowerArr_C': Node('PreTowerArr_C', 0),
+        'PreTowerDep_C': Node('PreTowerDep_C', 0),
+        'PreTowerArr_D': Node('PreTowerArr_D', 0),
+        'PreTowerDep_D': Node('PreTowerDep_D', 0),
+
+        # Enroute facilities
+        'TRACON_N': Node('TRACON_N', 2),
+        'TRACON_S': Node('TRACON_S', 2),
+        'CENTER': Node('CENTER', 2),
+
+        # Gates (used for spawning & final arrival only)
+        'A': Node('A', 0),
+        'B': Node('B', 0),
+        'C': Node('C', 0),
+        'D': Node('D', 0),
+    }
+    return nodes
+
+def generate_route(origin, destination):
+    """
+    Departures: Gate_origin -> PreTowerDep_origin -> Tower_origin -> TRACON_out -> CENTER
+                -> TRACON_in -> PreTowerArr_dest -> Tower_dest -> Gate_dest
+    """
+    pre_dep_origin = f"PreTowerDep_{origin}"
+    tower_origin = f"Tower_{origin}"
+    pre_arr_dest = f"PreTowerArr_{destination}"
+    tower_dest = f"Tower_{destination}"
+
+    if origin in ['A', 'B']:
+        tracon_out = "TRACON_S"
+        tracon_in = "TRACON_N"
+    else:
+        tracon_out = "TRACON_N"
+        tracon_in = "TRACON_S"
+
+    return [pre_dep_origin, tower_origin, tracon_out, "CENTER", tracon_in, pre_arr_dest, tower_dest, destination]
+
+def get_destination_from_roll(origin, roll):
+    if origin in ['A', 'B']:
+        return 'C' if roll <= 3 else 'D'
+    elif origin in ['C', 'D']:
+        return 'A' if roll <= 3 else 'B'
+    else:
+        raise ValueError(f"Invalid origin gate: {origin}")
+
+# -----------------------------
+# Streamlit State Initialization
+# -----------------------------
+if 'nodes' not in st.session_state:
+    st.session_state.nodes = initialize_simulation()
+    st.session_state.aircraft_list = []
+    st.session_state.aircraft_id = 1
+    st.session_state.step = 1
+    st.session_state.phase = 1  # 1 = Roll, 2 = Beads, 3 = Move
+
+# -----------------------------
+# Sub-Step Execution
+# -----------------------------
+def run_substep():
+    nodes = st.session_state.nodes
+    aircraft_list = st.session_state.aircraft_list
+    aircraft_id = st.session_state.aircraft_id
+    step = st.session_state.step
+    phase = st.session_state.phase
+
+    if phase == 1:
+        # Roll capacities:
+        #   - TRACON & CENTER: 2 dice
+        #   - Towers & Gates: 1 die
+        #   - PreTower (Arr/Dep) queues: skip (passive FIFO)
+        for name, node in nodes.items():
+            if name.startswith("PreTowerArr_") or name.startswith("PreTowerDep_"):
+                continue
+            dice = 2 if ('TRACON' in name or name == 'CENTER') else 1
+            node.roll_capacity(dice)
+
+        # Spawn aircraft from Gate -> PreTowerDep_origin
+        for gate in ['A','B','C','D']:
+            if nodes[gate].dice_rolls:
+                spawn_roll = nodes[gate].dice_rolls[0]
+                destination = get_destination_from_roll(gate, spawn_roll)
+                route = generate_route(gate, destination)
+                ac = Aircraft(aircraft_id, gate, destination, route, spawn_roll)
+                nodes[route[0]].queue.append(ac)  # into PreTowerDep_*
+                aircraft_list.append(ac)
+                aircraft_id += 1
+
+    elif phase == 2:
+        # Assign beads everywhere (prequeues have threshold 0 => Ready)
+        for node in nodes.values():
+            node.assign_beads()
+
+    elif phase == 3:
+        # Pass 1: move everything except prequeues to free capacity
+        for name, node in nodes.items():
+            if name.startswith("PreTowerArr_") or name.startswith("PreTowerDep_"):
+                continue
+            node.move_ready_aircraft(nodes)
+
+        # Pass 2: arrival-first feeding from prequeues into Towers
+        for airport in ['A','B','C','D']:
+            # Move arrivals first
+            nodes[f'PreTowerArr_{airport}'].move_ready_aircraft(nodes)
+            # Then departures
+            nodes[f'PreTowerDep_{airport}'].move_ready_aircraft(nodes)
+
+        st.session_state.step += 1
+
+    # Advance phase & persist counters
+    st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
+    st.session_state.aircraft_id = aircraft_id
+
+# -----------------------------
+# Streamlit UI
+# -----------------------------
+st.title("🛫 NAS Bead & Bowl Simulator — Arrival/Departure Pre-Tower Queues (Arrivals Priority)")
+
+st.markdown("""
+**Three sub-steps per turn:**
+1. **🎲 Roll Dice** (and spawn aircraft)
+2. **💎 Distribute Beads**
+3. **✈️ Move Aircraft**  
+   - Non-prequeue nodes move first  
+   - Then **Arrivals feed Towers first**, followed by **Departures** (Towers capped at 2)
+""")
+
+st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
+
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Run Next Sub-Step"):
+        run_substep()
+with col2:
+    if st.button("🔁 Reset Simulation"):
+        st.session_state.clear()
+        st.experimental_rerun()
+
+# Aircraft table
+results = [ac.to_dict() for ac in st.session_state.aircraft_list]
+df = pd.DataFrame(results)
+st.dataframe(df, use_container_width=True)
+
+# Node status table
+node_status = []
+for name, node in st.session_state.nodes.items():
+    node_status.append({
+        "Node": name,
+        "Aircraft Count": len(node.queue),
+        "Dice Roll(s)": node.dice_rolls,
+        "Total Capacity": node.capacity
+    })
+
+st.markdown("### 📊 Node Status Overview")
+st.dataframe(pd.DataFrame(node_status), use_container_width=True)
