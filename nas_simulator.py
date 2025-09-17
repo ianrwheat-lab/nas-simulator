@@ -96,10 +96,10 @@ class Node:
 # -----------------------------
 def initialize_simulation():
     nodes = {
-        'Tower_A': Node('Tower_A', 3, max_queue=2),
-        'Tower_B': Node('Tower_B', 3, max_queue=2),
-        'Tower_C': Node('Tower_C', 3, max_queue=2),
-        'Tower_D': Node('Tower_D', 3, max_queue=2),
+        'Tower_A': Node('Tower_A', 3, max_queue=3),
+        'Tower_B': Node('Tower_B', 3, max_queue=3),
+        'Tower_C': Node('Tower_C', 3, max_queue=3),
+        'Tower_D': Node('Tower_D', 3, max_queue=3),
         'PreTower_A': Node('PreTower_A', 0),
         'PreTower_B': Node('PreTower_B', 0),
         'PreTower_C': Node('PreTower_C', 0),
@@ -219,3 +219,4 @@ for name, node in st.session_state.nodes.items():
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
