@@ -55,7 +55,9 @@ class Node:
             if aircraft.status == "Ready to Move":
                 self.queue.remove(aircraft)
                 aircraft.beads = 0
-                aircraft.route.pop(0)
+                if aircraft.route:
+                    aircraft.route.pop(0)
+
                 if aircraft.route:
                     next_stop = aircraft.route[0]
                     aircraft.location = next_stop
