@@ -77,19 +77,24 @@ def initialize_simulation():
         'TRACON_N': Node('TRACON_N', 2),
         'TRACON_S': Node('TRACON_S', 2),
         'CENTER': Node('CENTER', 2),
+        'Gate_A': Node('Gate_A', 0),
+        'Gate_B': Node('Gate_B', 0),
+        'Gate_C': Node('Gate_C', 0),
+        'Gate_D': Node('Gate_D', 0),
     }
     return nodes
 
 def generate_route(origin, destination):
     tower_origin = f"Tower_{origin}"
     tower_dest = f"Tower_{destination}"
+    gate_dest = f"Gate_{destination}"
     if origin in ['A', 'B']:
         tracon_out = "TRACON_S"
         tracon_in = "TRACON_N"
     else:
         tracon_out = "TRACON_N"
         tracon_in = "TRACON_S"
-    return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest]
+    return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest, gate_dest]
 
 def get_destination(origin):
     if origin in ['A', 'B']:
