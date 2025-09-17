@@ -89,6 +89,14 @@ def generate_route(origin, destination):
         tracon_in = "TRACON_S"
     return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest]
 
+def get_destination(origin):
+    if origin in ['A', 'B']:
+        return 'C' if random.randint(1, 6) <= 3 else 'D'
+    elif origin in ['C', 'D']:
+        return 'A' if random.randint(1, 6) <= 3 else 'B'
+    else:
+        raise ValueError(f"Invalid origin gate: {origin}")
+
 # -----------------------------
 # Streamlit State Initialization
 # -----------------------------
@@ -113,8 +121,7 @@ def run_substep():
         # Spawn aircraft (only once per full step)
         spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
         for gate in spawn_gates:
-            roll = random.randint(1, 6)
-            destination = 'C' if roll <= 3 else 'D' if gate in ['A', 'B'] else 'A' if roll <= 3 else 'B'
+            destination = get_destination(gate)
             route = generate_route(gate, destination)
             ac = Aircraft(aircraft_id, gate, destination, route)
             nodes[route[0]].queue.append(ac)
