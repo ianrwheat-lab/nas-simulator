@@ -7,7 +7,7 @@ import pandas as pd
 # Aircraft Class
 # -----------------------------
 class Aircraft:
-    def __init__(self, id, origin, destination, route):
+    def __init__(self, id, origin, destination, route, spawn_roll):
         self.id = id
         self.origin = origin
         self.destination = destination
@@ -15,6 +15,7 @@ class Aircraft:
         self.location = route[0] if route else destination
         self.beads = 0
         self.status = "In System"
+        self.spawn_roll = spawn_roll
 
     def to_dict(self):
         return {
@@ -25,6 +26,7 @@ class Aircraft:
             "Beads": self.beads,
             "Status": self.status,
             "Next Stop": self.route[1] if len(self.route) > 1 else "Arrived",
+            "Spawn Roll": self.spawn_roll,
         }
 
 # -----------------------------
@@ -46,16 +48,12 @@ class Node:
         if not self.queue:
             return
 
-        total_aircraft = len(self.queue)
-        distributed = 0
-
         while self.capacity > 0:
             all_filled = True
             for aircraft in self.queue:
                 if aircraft.beads < self.bead_threshold:
                     aircraft.beads += 1
                     self.capacity -= 1
-                    distributed += 1
                     all_filled = False
                     if self.capacity == 0:
                         break
@@ -114,11 +112,11 @@ def generate_route(origin, destination):
         tracon_in = "TRACON_S"
     return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest, destination]
 
-def get_destination(origin):
+def get_destination_from_roll(origin, roll):
     if origin in ['A', 'B']:
-        return 'C' if random.randint(1, 6) <= 3 else 'D'
+        return 'C' if roll <= 3 else 'D'
     elif origin in ['C', 'D']:
-        return 'A' if random.randint(1, 6) <= 3 else 'B'
+        return 'A' if roll <= 3 else 'B'
     else:
         raise ValueError(f"Invalid origin gate: {origin}")
 
@@ -143,19 +141,21 @@ def run_substep():
     phase = st.session_state.phase
 
     if phase == 1:
+        # Roll all node capacities first
+        for name, node in nodes.items():
+            node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
+
         # Spawn aircraft (only once per full step)
         spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
         for gate in spawn_gates:
-            destination = get_destination(gate)
-            route = generate_route(gate, destination)
-            ac = Aircraft(aircraft_id, gate, destination, route)
-            nodes[route[0]].queue.append(ac)
-            aircraft_list.append(ac)
-            aircraft_id += 1
-
-        # Roll all node capacities
-        for name, node in nodes.items():
-            node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
+            if nodes[gate].dice_rolls:
+                spawn_roll = nodes[gate].dice_rolls[0]
+                destination = get_destination_from_roll(gate, spawn_roll)
+                route = generate_route(gate, destination)
+                ac = Aircraft(aircraft_id, gate, destination, route, spawn_roll)
+                nodes[route[0]].queue.append(ac)
+                aircraft_list.append(ac)
+                aircraft_id += 1
 
     elif phase == 2:
         for node in nodes.values():
