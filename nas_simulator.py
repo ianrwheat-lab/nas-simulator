@@ -107,7 +107,7 @@ class Center:
                 dest_tracon = outbound_tracons[ac.origin]
                 ac.location = f"TRACON_{dest_tracon}"
                 ac.status = "Returning"
-                tracon_lookup[dest_tracon].queue.append(ac)
+                st.session_state.tracon_lookup[dest_tracon].queue.append(ac)
                 moved += 1
 
 # -----------------------------
@@ -128,6 +128,7 @@ def initialize_simulation():
 # -----------------------------
 if 'gates' not in st.session_state:
     st.session_state.gates, st.session_state.towers, st.session_state.tracons, st.session_state.center = initialize_simulation()
+    st.session_state.tracon_lookup = st.session_state.tracons
     st.session_state.aircraft_list = []
     st.session_state.aircraft_id = 1
     st.session_state.step = 1
@@ -136,7 +137,6 @@ if 'gates' not in st.session_state:
 # Single Step Logic
 # -----------------------------
 def run_step():
-    global tracon_lookup
     gates = st.session_state.gates
     towers = st.session_state.towers
     tracons = st.session_state.tracons
@@ -145,7 +145,6 @@ def run_step():
     aircraft_id = st.session_state.aircraft_id
     step = st.session_state.step
 
-    tracon_lookup = tracons
     spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
 
     for gate_name in spawn_gates:
