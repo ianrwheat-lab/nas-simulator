@@ -12,7 +12,7 @@ class Aircraft:
         self.origin = origin
         self.destination = destination
         self.route = route
-        self.location = route[0] if route else f"Gate_{destination}"
+        self.location = route[0] if route else destination
         self.beads = 0
         self.status = "In System"
 
@@ -66,7 +66,7 @@ class Node:
                 else:
                     aircraft.location = aircraft.destination
                     aircraft.status = "Arrived"
-                    node_map[f"Gate_{aircraft.destination}"].queue.append(aircraft)
+                    node_map[aircraft.destination].queue.append(aircraft)
 
 # -----------------------------
 # Initialization
@@ -80,24 +80,23 @@ def initialize_simulation():
         'TRACON_N': Node('TRACON_N', 2),
         'TRACON_S': Node('TRACON_S', 2),
         'CENTER': Node('CENTER', 2),
-        'Gate_A': Node('Gate_A', 0),
-        'Gate_B': Node('Gate_B', 0),
-        'Gate_C': Node('Gate_C', 0),
-        'Gate_D': Node('Gate_D', 0),
+        'A': Node('A', 0),
+        'B': Node('B', 0),
+        'C': Node('C', 0),
+        'D': Node('D', 0),
     }
     return nodes
 
 def generate_route(origin, destination):
     tower_origin = f"Tower_{origin}"
     tower_dest = f"Tower_{destination}"
-    gate_dest = f"Gate_{destination}"
     if origin in ['A', 'B']:
         tracon_out = "TRACON_S"
         tracon_in = "TRACON_N"
     else:
         tracon_out = "TRACON_N"
         tracon_in = "TRACON_S"
-    return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest, gate_dest]
+    return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest, destination]
 
 def get_destination(origin):
     if origin in ['A', 'B']:
