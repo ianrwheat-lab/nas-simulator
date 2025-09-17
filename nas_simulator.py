@@ -111,8 +111,14 @@ class Center:
                 moved += 1
 
 # -----------------------------
-# Initialization
+# Simulation State
 # -----------------------------
+if 'state' not in st.session_state:
+    st.session_state.gates, st.session_state.towers, st.session_state.tracons, st.session_state.center = initialize_simulation()
+    st.session_state.aircraft_list = []
+    st.session_state.aircraft_id = 1
+    st.session_state.step = 1
+
 def initialize_simulation():
     gates = {name: Gate(name) for name in ['A', 'B', 'C', 'D']}
     towers = {name: Tower(name) for name in ['A', 'B', 'C', 'D']}
@@ -124,73 +130,73 @@ def initialize_simulation():
     return gates, towers, tracons, center
 
 # -----------------------------
-# Simulation Logic
+# Single Step Logic
 # -----------------------------
-def run_simulation(rounds=5):
+def run_step():
     global tracon_lookup
-    gates, towers, tracons, center = initialize_simulation()
+    gates = st.session_state.gates
+    towers = st.session_state.towers
+    tracons = st.session_state.tracons
+    center = st.session_state.center
+    aircraft_list = st.session_state.aircraft_list
+    aircraft_id = st.session_state.aircraft_id
+    step = st.session_state.step
+
     tracon_lookup = tracons
-    aircraft_list = []
-    aircraft_id = 1
+    spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
 
-    for step in range(1, rounds + 1):
-        spawn_gates = ['A', 'B'] if step % 2 == 1 else ['C', 'D']
+    for gate_name in spawn_gates:
+        dest = gates[gate_name].decide_destination()
+        ac = Aircraft(aircraft_id, origin=gate_name)
+        ac.route = [gate_name, f"Tower_{dest}"]
+        ac.location = f"Tower_{dest}"
+        ac.status = "Waiting for Beads"
+        towers[dest].queue.append(ac)
+        aircraft_list.append(ac)
+        aircraft_id += 1
 
-        # Step 1: Gate spawning
-        for gate_name in spawn_gates:
-            dest = gates[gate_name].decide_destination()
-            ac = Aircraft(aircraft_id, origin=gate_name)
-            ac.route = [gate_name, f"Tower_{dest}"]
-            ac.location = f"Tower_{dest}"
-            ac.status = "Waiting for Beads"
-            towers[dest].queue.append(ac)
-            aircraft_list.append(ac)
-            aircraft_id += 1
+    for tower in towers.values():
+        tower.roll_capacity()
+        tower.assign_beads()
 
-        # Step 2: Tower bead assignment
-        for tower in towers.values():
-            tower.roll_capacity()
-            tower.assign_beads()
+    for tower_name, tower in towers.items():
+        tracon = tracons['N'] if tower_name in ['A', 'B'] else tracons['S']
+        for ac in list(tower.queue):
+            if ac.beads == 3 and ac.status == "Ready for TRACON":
+                ac.location = f"TRACON_{tracon.name}"
+                ac.status = "In TRACON"
+                ac.beads = 0
+                tracon.queue.append(ac)
+                tower.queue.remove(ac)
 
-        # Step 3: Move to TRACON
-        for tower_name, tower in towers.items():
-            tracon = tracons['N'] if tower_name in ['A', 'B'] else tracons['S']
-            for ac in list(tower.queue):
-                if ac.beads == 3 and ac.status == "Ready for TRACON":
-                    ac.location = f"TRACON_{tracon.name}"
-                    ac.status = "In TRACON"
-                    ac.beads = 0
-                    tracon.queue.append(ac)
-                    tower.queue.remove(ac)
+    for tracon in tracons.values():
+        tracon.roll_capacity()
+        tracon.assign_beads()
+        tracon.move_aircraft(center.queue)
 
-        # Step 4: TRACON to CENTER
-        for tracon in tracons.values():
-            tracon.roll_capacity()
-            tracon.assign_beads()
-            tracon.move_aircraft(center.queue)
+    center.roll_capacity()
+    center.assign_beads()
+    center.move_aircraft({'A': 'N', 'B': 'N', 'C': 'S', 'D': 'S'})
 
-        # Step 5: CENTER to return TRACON
-        center.roll_capacity()
-        center.assign_beads()
-        center.move_aircraft({'A': 'N', 'B': 'N', 'C': 'S', 'D': 'S'})
-
-    return [ac.to_dict() for ac in aircraft_list]
+    st.session_state.aircraft_id = aircraft_id
+    st.session_state.step += 1
 
 # -----------------------------
 # Streamlit App
 # -----------------------------
-st.title("🛫 NAS Bead & Bowl Simulator - Enhanced")
+st.title("🛫 NAS Bead & Bowl Simulator - Step Mode")
 
 st.markdown("""
-Simulate aircraft flow through the National Airspace System (NAS) with:
+Simulate aircraft flow through the National Airspace System (NAS):
+- **Step through each round manually**
 - **Alternating gate spawns**
 - **Two-dice capacity for TRACONs and CENTER**
-- **Dynamic bead needs**: 3 for Towers, 2 for TRACONs & CENTER
+- **Dynamic bead needs: 3 at Towers, 2 at TRACON & CENTER**
 """)
 
-rounds = st.slider("How many time steps to simulate?", 1, 20, 5)
+if st.button("Run One Step"):
+    run_step()
 
-if st.button("Run Simulation"):
-    results = run_simulation(rounds)
-    df = pd.DataFrame(results)
-    st.dataframe(df, use_container_width=True)
+results = [ac.to_dict() for ac in st.session_state.aircraft_list]
+df = pd.DataFrame(results)
+st.dataframe(df, use_container_width=True)
