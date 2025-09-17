@@ -12,7 +12,7 @@ class Aircraft:
         self.origin = origin
         self.destination = destination
         self.route = route
-        self.location = route[0]
+        self.location = route[0] if route else f"Gate_{destination}"
         self.beads = 0
         self.status = "In System"
 
@@ -64,6 +64,7 @@ class Node:
                 else:
                     aircraft.location = aircraft.destination
                     aircraft.status = "Arrived"
+                    node_map[f"Gate_{aircraft.destination}"].queue.append(aircraft)
 
 # -----------------------------
 # Initialization
