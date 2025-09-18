@@ -39,8 +39,14 @@ class Node:
         self.dice_rolls = []
         self.queue = deque()
         self.bead_threshold = bead_threshold
+        self.is_prequeue = name.startswith("PreTower")
 
     def roll_capacity(self, dice_count=1):
+        if self.is_prequeue:
+            self.dice_rolls = []
+            self.capacity = 0
+            return
+
         penalty_dice = [1, 2, 3, 4, 4, 4]
         self.dice_rolls = []
         for _ in range(dice_count):
@@ -51,7 +57,7 @@ class Node:
         self.capacity = sum(self.dice_rolls)
 
     def assign_beads(self):
-        if not self.queue:
+        if self.is_prequeue or not self.queue:
             return
 
         while self.capacity > 0:
@@ -92,31 +98,34 @@ class Node:
 # Initialization
 # -----------------------------
 def initialize_simulation():
-    nodes = {
-        'Tower_A': Node('Tower_A', 3),
-        'Tower_B': Node('Tower_B', 3),
-        'Tower_C': Node('Tower_C', 3),
-        'Tower_D': Node('Tower_D', 3),
+    nodes = {}
+    for gate in ['A', 'B', 'C', 'D']:
+        nodes[f'Tower_{gate}'] = Node(f'Tower_{gate}', 3)
+        nodes[f'PreTowerDep_{gate}'] = Node(f'PreTowerDep_{gate}', 0)
+        nodes[f'PreTowerArr_{gate}'] = Node(f'PreTowerArr_{gate}', 0)
+        nodes[gate] = Node(gate, 0)
+
+    nodes.update({
         'TRACON_N': Node('TRACON_N', 2),
         'TRACON_S': Node('TRACON_S', 2),
-        'CENTER': Node('CENTER', 2),
-        'A': Node('A', 0),
-        'B': Node('B', 0),
-        'C': Node('C', 0),
-        'D': Node('D', 0),
-    }
+        'CENTER': Node('CENTER', 2)
+    })
     return nodes
 
 def generate_route(origin, destination):
+    dep_pre = f"PreTowerDep_{origin}"
     tower_origin = f"Tower_{origin}"
     tower_dest = f"Tower_{destination}"
+    arr_pre = f"PreTowerArr_{destination}"
+
     if origin in ['A', 'B']:
         tracon_out = "TRACON_S"
         tracon_in = "TRACON_N"
     else:
         tracon_out = "TRACON_N"
         tracon_in = "TRACON_S"
-    return [tower_origin, tracon_out, "CENTER", tracon_in, tower_dest, destination]
+
+    return [dep_pre, tower_origin, tracon_out, "CENTER", tracon_in, arr_pre, tower_dest, destination]
 
 def get_destination_from_roll(origin, roll):
     if origin in ['A', 'B']:
@@ -147,11 +156,9 @@ def run_substep():
     phase = st.session_state.phase
 
     if phase == 1:
-        # Roll all node capacities first
         for name, node in nodes.items():
             node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
 
-        # Spawn aircraft (only once per full step)
         for gate in ['A','B','C','D']:
             if nodes[gate].dice_rolls:
                 spawn_roll = nodes[gate].dice_rolls[0]
@@ -167,11 +174,27 @@ def run_substep():
             node.assign_beads()
 
     elif phase == 3:
-        for node in nodes.values():
-            node.move_ready_aircraft(nodes)
+        # First pass: move all non-prequeue nodes
+        for name, node in nodes.items():
+            if not node.is_prequeue:
+                node.move_ready_aircraft(nodes)
+
+        # Second pass: feed Towers from prequeues with arrival priority
+        for gate in ['A','B','C','D']:
+            tower = nodes[f'Tower_{gate}']
+            pre_arr = nodes[f'PreTowerArr_{gate}']
+            pre_dep = nodes[f'PreTowerDep_{gate}']
+
+            while len(tower.queue) < 2:
+                if pre_arr.queue:
+                    tower.queue.append(pre_arr.queue.popleft())
+                elif pre_dep.queue:
+                    tower.queue.append(pre_dep.queue.popleft())
+                else:
+                    break
+
         st.session_state.step += 1
 
-    # Advance to next phase or reset
     st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
     st.session_state.aircraft_id = aircraft_id
 
@@ -205,12 +228,10 @@ for name, node in st.session_state.nodes.items():
     node_status.append({
         "Node": name,
         "Aircraft Count": len(node.queue),
-        "Penalized": len(node.queue) >= 3,
+        "Penalized": len(node.queue) >= 3 if not node.is_prequeue else False,
         "Dice Roll(s)": node.dice_rolls,
         "Total Capacity": node.capacity
     })
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
-
-
