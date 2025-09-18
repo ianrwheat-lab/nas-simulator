@@ -28,7 +28,9 @@ if "nodes" not in st.session_state:
 
 if "turn" not in st.session_state:
     st.session_state.turn = 0
-
+    
+if "moves" not in st.session_state:
+    st.session_state.moves = {}
 # -----------------------------
 # Sidebar Controls
 # -----------------------------
@@ -121,7 +123,7 @@ if st.button("Move Aircraft"):
             st.session_state.nodes[i].queue.append(ac)
 
    # Store results in session state
-st.session_state.moves = moves
+   st.session_state.moves = moves
 
 # -----------------------------
 # Display Queues + Dice Rolls
@@ -142,9 +144,10 @@ st.dataframe(df, use_container_width=True)
 # -----------------------------
 # Display Turn Results (after system state)
 # -----------------------------
-if "moves" in st.session_state and st.session_state.moves:
+if st.session_state.moves:
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(st.session_state.moves)
+
 
 
 
