@@ -74,18 +74,22 @@ if st.button("Run Turn"):
     st.session_state.turn += 1
     moves = {}
 
-    # Step 1: Gate 1 releases aircraft
+    # Phase 1: Roll dice for all nodes (except Gate 2)
+    for node in st.session_state.nodes[:-1]:
+        node.roll_capacity()
+
+    # Phase 2: Gate 1 releases aircraft
     gate1 = st.session_state.nodes[0]
-    release_count = gate1.roll_capacity()
+    release_count = gate1.last_roll
     for _ in range(release_count):
         gate1.queue.append("Aircraft")
     moves[gate1.name] = f"Released {release_count}"
 
-    # Step 2: Move aircraft through all nodes
-    for i in range(len(st.session_state.nodes) - 2, -1, -1):  # skip Gate 2
+    # Phase 3: Move aircraft left → right through the chain
+    for i in range(len(st.session_state.nodes) - 1):  # up to Gate 2
         node = st.session_state.nodes[i]
         next_node = st.session_state.nodes[i + 1]
-        capacity = node.roll_capacity()
+        capacity = node.last_roll
         moved = min(capacity, len(node.queue))
         for _ in range(moved):
             ac = node.queue.popleft()
@@ -95,6 +99,7 @@ if st.button("Run Turn"):
     # Display results
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(moves)
+
 
 # -----------------------------
 # Display Queues + Dice Rolls
@@ -111,3 +116,4 @@ df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
+
