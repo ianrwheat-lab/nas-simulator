@@ -76,27 +76,31 @@ for node in st.session_state.nodes[:-1]:
     node.dice = st.sidebar.selectbox(f"{node.name} Dice", [1, 2], index=0, key=f"dice_{node.name}")
 
 # -----------------------------
-# Simulation Step
+# Simulation Step: Roll Dice
 # -----------------------------
-if st.button("Run Turn"):
+if st.button("Roll Dice"):
+    for node in st.session_state.nodes[:-1]:  # exclude Gate 2
+        node.roll_capacity()
+    st.session_state.last_action = "Rolled dice"
+
+# -----------------------------
+# Simulation Step: Move Aircraft
+# -----------------------------
+if st.button("Move Aircraft"):
     st.session_state.turn += 1
     moves = {}
-
-    # Phase 1: Roll dice for all nodes (except Gate 2)
-    for node in st.session_state.nodes[:-1]:
-        node.roll_capacity()
 
     # Temporary storage for movements
     transfers = [[] for _ in st.session_state.nodes]
 
-    # Phase 2: Gate 1 releases aircraft
+    # Gate 1 releases aircraft
     gate1 = st.session_state.nodes[0]
     release_count = gate1.last_roll
     for _ in range(release_count):
         gate1.queue.append("Aircraft")
     moves[gate1.name] = f"Released {release_count}"
 
-    # Phase 3: Decide movements (but don’t apply yet)
+    # Decide movements (but don’t apply yet)
     for i in range(len(st.session_state.nodes) - 1):  # up to Gate 2
         node = st.session_state.nodes[i]
         next_node = st.session_state.nodes[i + 1]
@@ -106,17 +110,17 @@ if st.button("Run Turn"):
             moved = min(capacity, len(node.queue))
             for _ in range(moved):
                 ac = node.queue.popleft()
-                transfers[i + 1].append(ac)  # store for next node
+                transfers[i + 1].append(ac)
             moves[node.name] = f"Will move {moved} forward"
         else:
             moves[node.name] = "No aircraft to move"
 
-    # Phase 4: Apply movements all at once
+    # Apply movements all at once
     for i, incoming in enumerate(transfers):
         for ac in incoming:
             st.session_state.nodes[i].queue.append(ac)
 
-    # Display results
+    # Show results
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(moves)
 
@@ -135,4 +139,5 @@ df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
+
 
