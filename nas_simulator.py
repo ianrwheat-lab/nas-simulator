@@ -44,7 +44,7 @@ class Node:
         penalty_dice = [1, 2, 3, 4, 4, 4]
         self.dice_rolls = []
         for _ in range(dice_count):
-            if len(self.queue) >= 4:
+            if len(self.queue) >= 3:
                 self.dice_rolls.append(random.choice(penalty_dice))
             else:
                 self.dice_rolls.append(random.randint(1, 6))
@@ -212,3 +212,4 @@ for name, node in st.session_state.nodes.items():
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
