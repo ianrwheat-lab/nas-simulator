@@ -120,9 +120,7 @@ if st.button("Move Aircraft"):
         for ac in incoming:
             st.session_state.nodes[i].queue.append(ac)
 
-    # Show results
-    st.write(f"### Turn {st.session_state.turn} Results")
-    st.write(moves)
+   
 
 # -----------------------------
 # Display Queues + Dice Rolls
@@ -140,4 +138,7 @@ df = pd.DataFrame(data)
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
 
+ # Show results
+    st.write(f"### Turn {st.session_state.turn} Results")
+    st.write(moves)
 
