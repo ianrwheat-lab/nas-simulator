@@ -28,9 +28,10 @@ if "nodes" not in st.session_state:
 
 if "turn" not in st.session_state:
     st.session_state.turn = 0
-    
+
 if "moves" not in st.session_state:
     st.session_state.moves = {}
+
 # -----------------------------
 # Sidebar Controls
 # -----------------------------
@@ -46,6 +47,7 @@ start_aircraft = st.sidebar.number_input("Starting Aircraft per Node", min_value
 if st.sidebar.button("Reset Game"):
     st.session_state.nodes = []
     st.session_state.turn = 0
+    st.session_state.moves = {}
 
 # -----------------------------
 # Build Node Chain
@@ -67,7 +69,7 @@ node_names += [
 # Initialize nodes if empty or structure changed
 if not st.session_state.nodes or len(st.session_state.nodes) != len(node_names):
     st.session_state.nodes = [Node(name) for name in node_names]
-     # Preload chosen number of aircraft at every node except Gate 1 and Gate 2
+    # Preload chosen number of aircraft at every node except Gate 1 and Gate 2
     for node in st.session_state.nodes:
         if node.name not in ["Gate 1", "Gate 2 (Completed Flights)"]:
             for _ in range(start_aircraft):
@@ -83,7 +85,7 @@ for node in st.session_state.nodes[:-1]:
 if st.button("Roll Dice"):
     for node in st.session_state.nodes[:-1]:  # exclude Gate 2
         node.roll_capacity()
-    st.session_state.last_action = "Rolled dice"
+    st.session_state.moves = {"Action": "Rolled dice"}
 
 # -----------------------------
 # Simulation Step: Move Aircraft
@@ -122,8 +124,8 @@ if st.button("Move Aircraft"):
         for ac in incoming:
             st.session_state.nodes[i].queue.append(ac)
 
-   # Store results in session state
-   st.session_state.moves = moves
+    # Store results in session state
+    st.session_state.moves = moves
 
 # -----------------------------
 # Display Queues + Dice Rolls
@@ -132,7 +134,7 @@ data = {
     "Node": [node.name for node in st.session_state.nodes],
     "Aircraft in Queue": [len(node) for node in st.session_state.nodes],
     "Last Dice Roll": [
-        node.last_roll if node.name != "Gate 2 (Completed Flights)" else "-" 
+        node.last_roll if node.name != "Gate 2 (Completed Flights)" else "-"
         for node in st.session_state.nodes
     ],
 }
@@ -147,7 +149,3 @@ st.dataframe(df, use_container_width=True)
 if st.session_state.moves:
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(st.session_state.moves)
-
-
-
-
