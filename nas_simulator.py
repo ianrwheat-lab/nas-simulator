@@ -40,11 +40,11 @@ class Node:
         self.queue = deque()
         self.bead_threshold = bead_threshold
         self.is_tower = is_tower
-        self.is_queue = is_queue  # True if PreTower queue
+        self.is_queue = is_queue
         self.queue_type = queue_type  # "arrival" or "departure"
 
     def roll_capacity(self, dice_count=1):
-        if self.is_queue:  # queues do not roll dice
+        if self.is_queue:
             return
         penalty_dice = [1, 2, 3, 4, 4, 4]
         self.dice_rolls = []
@@ -57,7 +57,7 @@ class Node:
 
     def assign_beads(self):
         if self.is_queue:
-            return  # queues don't assign beads
+            return
         if not self.queue:
             return
 
@@ -78,7 +78,6 @@ class Node:
                 aircraft.status = "Ready to Move"
 
     def move_ready_aircraft(self, node_map):
-        # Towers handled separately (release then refill logic)
         if self.is_tower or self.is_queue:
             return
 
@@ -91,13 +90,11 @@ class Node:
 
                 if aircraft.route:
                     next_stop = aircraft.route[0]
-                    # Check if next stop is tower and has capacity
                     if node_map[next_stop].is_tower and len(node_map[next_stop].queue) < 2:
                         aircraft.location = next_stop
                         aircraft.status = "In System"
                         node_map[next_stop].queue.append(aircraft)
                     elif node_map[next_stop].is_tower:
-                        # Tower full → send to pre-queue
                         queue_name = f"PreTowerArr_{next_stop[-1]}" if "TRACON" in self.name else f"PreTowerDep_{next_stop[-1]}"
                         aircraft.location = queue_name
                         aircraft.status = "In System"
@@ -179,18 +176,15 @@ def run_substep():
     phase = st.session_state.phase
 
     if phase == 1:
-        # Roll all node capacities first
         for name, node in nodes.items():
             node.roll_capacity(2 if 'TRACON' in name or name == 'CENTER' else 1)
 
-        # Spawn aircraft (only once per full step)
         for gate in ['A','B','C','D']:
             if nodes[gate].dice_rolls:
                 spawn_roll = nodes[gate].dice_rolls[0]
                 destination = get_destination_from_roll(gate, spawn_roll)
                 route = generate_route(gate, destination)
                 ac = Aircraft(aircraft_id, gate, destination, route, spawn_roll)
-                # first stop is PreTowerDep
                 nodes[route[0]].queue.append(ac)
                 aircraft_list.append(ac)
                 aircraft_id += 1
@@ -227,7 +221,6 @@ def run_substep():
 
         st.session_state.step += 1
 
-    # Advance to next phase or reset
     st.session_state.phase = 1 if st.session_state.phase == 3 else st.session_state.phase + 1
     st.session_state.aircraft_id = aircraft_id
 
@@ -258,16 +251,33 @@ results = [ac.to_dict() for ac in st.session_state.aircraft_list]
 df = pd.DataFrame(results)
 st.dataframe(df, use_container_width=True)
 
-# New table: aircraft counts and dice rolls by node
+# -----------------------------
+# Node Status Table
+# -----------------------------
 node_status = []
 for name, node in st.session_state.nodes.items():
     node_status.append({
         "Node": name,
         "Aircraft Count": len(node.queue),
         "Penalized": (not node.is_queue) and len(node.queue) >= 3,
-        "Dice Roll(s)": node.dice_rolls if not node.is_queue else "N/A",
+        "Dice Roll(s)": str(node.dice_rolls) if not node.is_queue else "N/A",
         "Total Capacity": node.capacity if not node.is_queue else "N/A"
     })
 
 st.markdown("### 📊 Node Status Overview")
-st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
+# Convert to DataFrame
+df_status = pd.DataFrame(node_status)
+
+# Optional: highlight towers at full capacity
+def highlight_full(val, node_name):
+    if "Tower" in node_name and val == 2:
+        return "background-color: salmon; color: white"
+    return ""
+
+styled_df = df_status.style.apply(
+    lambda row: [highlight_full(row["Aircraft Count"], row["Node"]) for _ in row],
+    axis=1
+)
+
+st.dataframe(styled_df, use_container_width=True)
