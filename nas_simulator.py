@@ -41,9 +41,19 @@ if st.sidebar.button("Reset Game"):
 # -----------------------------
 # Build Node Chain
 # -----------------------------
-node_names = ["Gate 1", "Ground Controller 1", "Local Controller 1", "TRACON 1"]
+node_names = [
+    "Gate 1",
+    "Ground Controller 1",
+    "Local Controller 1",
+    "TRACON 1",
+]
 node_names += [f"Center {i+1}" for i in range(num_centers)]
-node_names += ["TRACON 2", "Gate 2 (Completed Flights)"]
+node_names += [
+    "TRACON 2",
+    "Local Controller 2",
+    "Ground Controller 2",
+    "Gate 2 (Completed Flights)",
+]
 
 # Initialize nodes if empty
 if not st.session_state.nodes or len(st.session_state.nodes) != len(node_names):
