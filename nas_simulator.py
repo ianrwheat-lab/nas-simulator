@@ -41,7 +41,13 @@ class Node:
         self.bead_threshold = bead_threshold
 
     def roll_capacity(self, dice_count=1):
-        self.dice_rolls = [random.randint(1, 6) for _ in range(dice_count)]
+        penalty_dice = [1, 2, 3, 4, 4, 4]
+        self.dice_rolls = []
+        for _ in range(dice_count):
+            if len(self.queue) >= 4:
+                self.dice_rolls.append(random.choice(penalty_dice))
+            else:
+                self.dice_rolls.append(random.randint(1, 6))
         self.capacity = sum(self.dice_rolls)
 
     def assign_beads(self):
@@ -180,6 +186,8 @@ Each turn now breaks into **three sub-steps**:
 1. **🎲 Roll Dice** for each node (and spawn aircraft)
 2. **💎 Distribute Beads** based on dice
 3. **✈️ Move Aircraft** to their next location
+
+🚨 Nodes with **4+ aircraft** are penalized with reduced dice values (1,2,3,4,4,4)
 """)
 
 st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
@@ -197,6 +205,7 @@ for name, node in st.session_state.nodes.items():
     node_status.append({
         "Node": name,
         "Aircraft Count": len(node.queue),
+        "Penalized": len(node.queue) >= 4,
         "Dice Roll(s)": node.dice_rolls,
         "Total Capacity": node.capacity
     })
