@@ -79,20 +79,21 @@ class Node:
     def move_ready_aircraft(self, node_map):
         for aircraft in list(self.queue):
             if aircraft.status == "Ready to Move":
-                self.queue.remove(aircraft)
-                aircraft.beads = 0
-                if aircraft.route:
-                    aircraft.route.pop(0)
-
-                if aircraft.route:
-                    next_stop = aircraft.route[0]
-                    aircraft.location = next_stop
-                    aircraft.status = "In System"
-                    node_map[next_stop].queue.append(aircraft)
-                else:
-                    aircraft.location = aircraft.destination
-                    aircraft.status = "Arrived"
-                    node_map[aircraft.destination].queue.append(aircraft)
+                next_stop = aircraft.route[1] if len(aircraft.route) > 1 else None
+                if next_stop and len(node_map[next_stop].queue) < 2:
+                    self.queue.remove(aircraft)
+                    aircraft.beads = 0
+                    if aircraft.route:
+                        aircraft.route.pop(0)
+                    if aircraft.route:
+                        next_stop = aircraft.route[0]
+                        aircraft.location = next_stop
+                        aircraft.status = "In System"
+                        node_map[next_stop].queue.append(aircraft)
+                    else:
+                        aircraft.location = aircraft.destination
+                        aircraft.status = "Arrived"
+                        node_map[aircraft.destination].queue.append(aircraft)
 
 # -----------------------------
 # Initialization
@@ -143,7 +144,7 @@ if 'nodes' not in st.session_state:
     st.session_state.aircraft_list = []
     st.session_state.aircraft_id = 1
     st.session_state.step = 1
-    st.session_state.phase = 1  # 1 = Roll, 2 = Beads, 3 = Move
+    st.session_state.phase = 1
 
 # -----------------------------
 # Sub-Step Execution
@@ -174,12 +175,10 @@ def run_substep():
             node.assign_beads()
 
     elif phase == 3:
-        # First pass: move all non-prequeue nodes
         for name, node in nodes.items():
             if not node.is_prequeue:
                 node.move_ready_aircraft(nodes)
 
-        # Second pass: feed Towers from prequeues with arrival priority
         for gate in ['A','B','C','D']:
             tower = nodes[f'Tower_{gate}']
             pre_arr = nodes[f'PreTowerArr_{gate}']
@@ -210,7 +209,7 @@ Each turn now breaks into **three sub-steps**:
 2. **💎 Distribute Beads** based on dice
 3. **✈️ Move Aircraft** to their next location
 
-🚨 Nodes with **3+ aircraft** are penalized with reduced dice values (1,2,3,4,4,4)
+🚨 Nodes with **4+ aircraft** are penalized with reduced dice values (1,2,3,4,4,4)
 """)
 
 st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
@@ -222,7 +221,6 @@ results = [ac.to_dict() for ac in st.session_state.aircraft_list]
 df = pd.DataFrame(results)
 st.dataframe(df, use_container_width=True)
 
-# New table: aircraft counts and dice rolls by node
 node_status = []
 for name, node in st.session_state.nodes.items():
     node_status.append({
@@ -235,4 +233,3 @@ for name, node in st.session_state.nodes.items():
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
-
