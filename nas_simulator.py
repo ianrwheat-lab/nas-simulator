@@ -205,11 +205,12 @@ for name, node in st.session_state.nodes.items():
     node_status.append({
         "Node": name,
         "Aircraft Count": len(node.queue),
-        "Penalized": len(node.queue) >= 4,
+        "Penalized": len(node.queue) >= 3,
         "Dice Roll(s)": node.dice_rolls,
         "Total Capacity": node.capacity
     })
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
 
