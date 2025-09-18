@@ -12,6 +12,7 @@ class Node:
         self.dice = dice
         self.queue = deque()
         self.last_roll = 0  # track dice roll result
+        self.special_count = 0  # track how many times special dice used
 
     def roll_capacity(self):
         threshold = 7 * self.dice
@@ -21,6 +22,7 @@ class Node:
             # Congested: use special dice [1,2,3,4,4,4]
             for _ in range(self.dice):
                 self.last_roll += random.choice([1, 2, 3, 4, 4, 4])
+            self.special_count += 1  # increment counter
         else:
             # Normal: use standard 1–6 dice
             for _ in range(self.dice):
@@ -148,6 +150,10 @@ data = {
         node.last_roll if node.name != "Gate 2 (Completed Flights)" else "-"
         for node in st.session_state.nodes
     ],
+    "Special Dice Used (times)": [
+        node.special_count if node.name != "Gate 2 (Completed Flights)" else "-"
+        for node in st.session_state.nodes
+    ],
 }
 df = pd.DataFrame(data)
 
@@ -160,4 +166,5 @@ st.dataframe(df, use_container_width=True)
 if st.session_state.moves:
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(st.session_state.moves)
+
 
