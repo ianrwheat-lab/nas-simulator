@@ -210,7 +210,7 @@ Each turn now breaks into **three sub-steps**:
 2. **💎 Distribute Beads** based on dice
 3. **✈️ Move Aircraft** to their next location
 
-🚨 Nodes with **4+ aircraft** are penalized with reduced dice values (1,2,3,4,4,4)
+🚨 Nodes with **3+ aircraft** are penalized with reduced dice values (1,2,3,4,4,4)
 """)
 
 st.write(f"**Current Step:** {st.session_state.step}  |  **Phase:** {st.session_state.phase} (1=Roll, 2=Beads, 3=Move)")
@@ -235,3 +235,4 @@ for name, node in st.session_state.nodes.items():
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
