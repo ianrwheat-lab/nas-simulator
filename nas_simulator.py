@@ -89,12 +89,16 @@ if st.button("Run Turn"):
     for i in range(len(st.session_state.nodes) - 1):  # up to Gate 2
         node = st.session_state.nodes[i]
         next_node = st.session_state.nodes[i + 1]
-        capacity = node.last_roll
-        moved = min(capacity, len(node.queue))
-        for _ in range(moved):
-            ac = node.queue.popleft()
-            next_node.queue.append(ac)
-        moves[node.name] = f"Moved {moved} forward"
+
+        if len(node.queue) > 0:  # only move if aircraft exist
+            capacity = node.last_roll
+            moved = min(capacity, len(node.queue))
+            for _ in range(moved):
+                ac = node.queue.popleft()
+                next_node.queue.append(ac)
+            moves[node.name] = f"Moved {moved} forward"
+        else:
+            moves[node.name] = "No aircraft to move"
 
     # Display results
     st.write(f"### Turn {st.session_state.turn} Results")
@@ -116,4 +120,5 @@ df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
+
 
