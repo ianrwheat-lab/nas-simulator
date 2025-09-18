@@ -65,10 +65,11 @@ node_names += [
 # Initialize nodes if empty or structure changed
 if not st.session_state.nodes or len(st.session_state.nodes) != len(node_names):
     st.session_state.nodes = [Node(name) for name in node_names]
-    # Preload chosen number of aircraft at every node except Gate 2
-    for node in st.session_state.nodes[:-1]:
-        for _ in range(start_aircraft):
-            node.queue.append("Aircraft")
+     # Preload chosen number of aircraft at every node except Gate 1 and Gate 2
+    for node in st.session_state.nodes:
+        if node.name not in ["Gate 1", "Gate 2 (Completed Flights)"]:
+            for _ in range(start_aircraft):
+                node.queue.append("Aircraft")
 
 # Dice controls for each node (except completed Gate 2)
 for node in st.session_state.nodes[:-1]:
@@ -134,3 +135,4 @@ df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
+
