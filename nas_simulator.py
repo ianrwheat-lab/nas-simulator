@@ -14,7 +14,18 @@ class Node:
         self.last_roll = 0  # track dice roll result
 
     def roll_capacity(self):
-        self.last_roll = sum(random.randint(1, 6) for _ in range(self.dice))
+        threshold = 7 * self.dice
+        self.last_roll = 0
+
+        if len(self.queue) >= threshold:
+            # Congested: use special dice [1,2,3,4,4,4]
+            for _ in range(self.dice):
+                self.last_roll += random.choice([1, 2, 3, 4, 4, 4])
+        else:
+            # Normal: use standard 1–6 dice
+            for _ in range(self.dice):
+                self.last_roll += random.randint(1, 6)
+
         return self.last_roll
 
     def __len__(self):
@@ -149,3 +160,4 @@ st.dataframe(df, use_container_width=True)
 if st.session_state.moves:
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(st.session_state.moves)
+
