@@ -45,6 +45,9 @@ if "turn" not in st.session_state:
 if "moves" not in st.session_state:
     st.session_state.moves = {}
 
+if "last_output" not in st.session_state:
+    st.session_state.last_output = 0  # tracks GC2 -> Gate 2 flow
+
 # -----------------------------
 # Sidebar Controls
 # -----------------------------
@@ -56,11 +59,15 @@ num_centers = st.sidebar.number_input("Number of Center Nodes", min_value=1, max
 # Starting aircraft setting
 start_aircraft = st.sidebar.number_input("Starting Aircraft per Node", min_value=0, max_value=20, value=4)
 
+# Toggle rule
+match_io_rule = st.sidebar.checkbox("Match Gate 1 input to Ground Controller 2 output", value=False)
+
 # Reset button
 if st.sidebar.button("Reset Game"):
     st.session_state.nodes = []
     st.session_state.turn = 0
     st.session_state.moves = {}
+    st.session_state.last_output = 0
 
 # -----------------------------
 # Build Node Chain
@@ -112,12 +119,16 @@ if st.button("Move Aircraft"):
 
     # Gate 1 releases aircraft
     gate1 = st.session_state.nodes[0]
-    release_count = gate1.last_roll
+    if match_io_rule:
+        release_count = st.session_state.last_output
+    else:
+        release_count = gate1.last_roll
     for _ in range(release_count):
         gate1.queue.append("Aircraft")
     moves[gate1.name] = f"Released {release_count}"
 
     # Decide movements (but don’t apply yet)
+    gc2_to_gate2 = 0  # track Ground Controller 2 -> Gate 2 this turn
     for i in range(len(st.session_state.nodes) - 1):  # up to Gate 2
         node = st.session_state.nodes[i]
         next_node = st.session_state.nodes[i + 1]
@@ -129,6 +140,10 @@ if st.button("Move Aircraft"):
                 ac = node.queue.popleft()
                 transfers[i + 1].append(ac)
             moves[node.name] = f"Will move {moved} forward"
+
+            # Track Ground Controller 2 -> Gate 2 flow
+            if node.name == "Ground Controller 2":
+                gc2_to_gate2 = moved
         else:
             moves[node.name] = "No aircraft to move"
 
@@ -136,6 +151,9 @@ if st.button("Move Aircraft"):
     for i, incoming in enumerate(transfers):
         for ac in incoming:
             st.session_state.nodes[i].queue.append(ac)
+
+    # Save GC2 -> Gate 2 output for next turn
+    st.session_state.last_output = gc2_to_gate2
 
     # Store results in session state
     st.session_state.moves = moves
@@ -167,4 +185,5 @@ if st.session_state.moves:
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(st.session_state.moves)
 
-
+    if match_io_rule:
+        st.info(f"Gate 1 matched last turn's Ground Controller 2 → Gate 2 output: {st.session_state.last_output}")
