@@ -11,9 +11,11 @@ class Node:
         self.name = name
         self.dice = dice
         self.queue = deque()
+        self.last_roll = 0  # track dice roll result
 
     def roll_capacity(self):
-        return sum(random.randint(1, 6) for _ in range(self.dice))
+        self.last_roll = sum(random.randint(1, 6) for _ in range(self.dice))
+        return self.last_roll
 
     def __len__(self):
         return len(self.queue)
@@ -57,7 +59,7 @@ node_names += [
     "Gate 2 (Completed Flights)",
 ]
 
-# Initialize nodes if empty
+# Initialize nodes if empty or structure changed
 if not st.session_state.nodes or len(st.session_state.nodes) != len(node_names):
     st.session_state.nodes = [Node(name) for name in node_names]
 
@@ -79,8 +81,8 @@ if st.button("Run Turn"):
         gate1.queue.append("Aircraft")
     moves[gate1.name] = f"Released {release_count}"
 
-    # Step 2: Move aircraft through all nodes (backward order)
-    for i in range(len(st.session_state.nodes) - 2, -1, -1):  # skip Gate 2 in loop
+    # Step 2: Move aircraft through all nodes
+    for i in range(len(st.session_state.nodes) - 2, -1, -1):  # skip Gate 2
         node = st.session_state.nodes[i]
         next_node = st.session_state.nodes[i + 1]
         capacity = node.roll_capacity()
@@ -95,14 +97,17 @@ if st.button("Run Turn"):
     st.write(moves)
 
 # -----------------------------
-# Display Queues
+# Display Queues + Dice Rolls
 # -----------------------------
 data = {
     "Node": [node.name for node in st.session_state.nodes],
     "Aircraft in Queue": [len(node) for node in st.session_state.nodes],
+    "Last Dice Roll": [
+        node.last_roll if node.name != "Gate 2 (Completed Flights)" else "-" 
+        for node in st.session_state.nodes
+    ],
 }
 df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
-
