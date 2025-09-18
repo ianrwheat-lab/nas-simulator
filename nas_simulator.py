@@ -312,11 +312,12 @@ for name, node in st.session_state.nodes.items():
     node_status.append({
         "Node": name,
         "Aircraft Count": len(node.queue),
-        "Penalized": (len(node.queue) >= 3 and not node.is_pretower),
-        "Dice Roll(s)": node.dice_rolls if node.dice_rolls else "-",
-        "Bead Capacity Left": node.capacity if not node.is_pretower else "N/A",
-        "Tower Max Occ": node.max_capacity if node.max_capacity is not None else "—",
+        "Penalized": "Yes" if (len(node.queue) >= 3 and not node.is_pretower) else "No",
+        "Dice Roll(s)": str(node.dice_rolls) if node.dice_rolls else "-",
+        "Bead Capacity Left": str(node.capacity) if not node.is_pretower else "N/A",
+        "Tower Max Occ": str(node.max_capacity) if node.max_capacity is not None else "—",
     })
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
