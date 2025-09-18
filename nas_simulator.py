@@ -1,5 +1,3 @@
-3 bowl penalty everywhere version (Round 1)
-
 import streamlit as st
 import random
 from collections import deque
@@ -214,5 +212,6 @@ for name, node in st.session_state.nodes.items():
 
 st.markdown("### 📊 Node Status Overview")
 st.dataframe(pd.DataFrame(node_status), use_container_width=True)
+
 
 
