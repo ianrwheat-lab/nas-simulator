@@ -78,6 +78,9 @@ if st.button("Run Turn"):
     for node in st.session_state.nodes[:-1]:
         node.roll_capacity()
 
+    # Temporary storage for movements
+    transfers = [[] for _ in st.session_state.nodes]
+
     # Phase 2: Gate 1 releases aircraft
     gate1 = st.session_state.nodes[0]
     release_count = gate1.last_roll
@@ -85,24 +88,30 @@ if st.button("Run Turn"):
         gate1.queue.append("Aircraft")
     moves[gate1.name] = f"Released {release_count}"
 
-    # Phase 3: Move aircraft left → right through the chain
+    # Phase 3: Decide movements (but don’t apply yet)
     for i in range(len(st.session_state.nodes) - 1):  # up to Gate 2
         node = st.session_state.nodes[i]
         next_node = st.session_state.nodes[i + 1]
 
-        if len(node.queue) > 0:  # only move if aircraft exist
+        if len(node.queue) > 0:
             capacity = node.last_roll
             moved = min(capacity, len(node.queue))
             for _ in range(moved):
                 ac = node.queue.popleft()
-                next_node.queue.append(ac)
-            moves[node.name] = f"Moved {moved} forward"
+                transfers[i + 1].append(ac)  # store for next node
+            moves[node.name] = f"Will move {moved} forward"
         else:
             moves[node.name] = "No aircraft to move"
+
+    # Phase 4: Apply movements all at once
+    for i, incoming in enumerate(transfers):
+        for ac in incoming:
+            st.session_state.nodes[i].queue.append(ac)
 
     # Display results
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(moves)
+
 
 
 # -----------------------------
@@ -120,5 +129,6 @@ df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
+
 
 
