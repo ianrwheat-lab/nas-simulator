@@ -23,6 +23,8 @@ class Node:
 # -----------------------------
 if "nodes" not in st.session_state:
     st.session_state.nodes = []
+
+if "turn" not in st.session_state:
     st.session_state.turn = 0
 
 # -----------------------------
@@ -103,3 +105,4 @@ df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
+
