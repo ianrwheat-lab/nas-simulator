@@ -37,6 +37,9 @@ st.sidebar.header("Game Settings")
 # Number of Center nodes
 num_centers = st.sidebar.number_input("Number of Center Nodes", min_value=1, max_value=5, value=2)
 
+# Starting aircraft setting
+start_aircraft = st.sidebar.number_input("Starting Aircraft per Node", min_value=0, max_value=20, value=4)
+
 # Reset button
 if st.sidebar.button("Reset Game"):
     st.session_state.nodes = []
@@ -62,6 +65,10 @@ node_names += [
 # Initialize nodes if empty or structure changed
 if not st.session_state.nodes or len(st.session_state.nodes) != len(node_names):
     st.session_state.nodes = [Node(name) for name in node_names]
+    # Preload chosen number of aircraft at every node except Gate 2
+    for node in st.session_state.nodes[:-1]:
+        for _ in range(start_aircraft):
+            node.queue.append("Aircraft")
 
 # Dice controls for each node (except completed Gate 2)
 for node in st.session_state.nodes[:-1]:
@@ -112,8 +119,6 @@ if st.button("Run Turn"):
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(moves)
 
-
-
 # -----------------------------
 # Display Queues + Dice Rolls
 # -----------------------------
@@ -129,6 +134,3 @@ df = pd.DataFrame(data)
 
 st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
-
-
-
