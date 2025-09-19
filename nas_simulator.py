@@ -153,11 +153,11 @@ if match_io_rule:
         target_node.queue.append("Aircraft")
     moves["Gate 1"] = f"Sent {release_count} directly to Ground Controller 1"
 else:
-    gate1 = st.session_state.nodes[0]
+    gate1 = st.session_state.nodes[0]  # explicitly re-define Gate 1
     release_count = gate1.last_roll
     for _ in range(release_count):
         gate1.queue.append("Aircraft")
-    moves[gate1.name] = f"Released {release_count}"
+    moves["Gate 1"] = f"Released {release_count}"
 
 # Save GC2 -> Gate 2 output for display/reference
 st.session_state.last_output = gc2_to_gate2
@@ -259,6 +259,7 @@ if st.session_state.moves:
 
     if match_io_rule:
         st.info(f"Gate 1 matched last turn's Ground Controller 2 → Gate 2 output: {st.session_state.last_output}")
+
 
 
 
