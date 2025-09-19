@@ -59,6 +59,9 @@ num_centers = st.sidebar.number_input("Number of Center Nodes", min_value=1, max
 # Starting aircraft setting
 start_aircraft = st.sidebar.number_input("Starting Aircraft per Node", min_value=0, max_value=20, value=4)
 
+# Auto-run settings
+auto_turns = st.sidebar.number_input("Turns to Run Automatically", min_value=1, max_value=100, value=10)
+
 # Toggle rule
 match_io_rule = st.sidebar.checkbox("Match Gate 1 input to Ground Controller 2 output", value=False)
 
@@ -157,6 +160,59 @@ if st.button("Move Aircraft"):
 
     # Store results in session state
     st.session_state.moves = moves
+    
+# -----------------------------
+# Simulation Step: Auto Run
+# -----------------------------
+if st.sidebar.button("Run Multiple Turns"):
+    for _ in range(auto_turns):
+        # Phase 1: Roll dice
+        for node in st.session_state.nodes[:-1]:
+            node.roll_capacity()
+
+        st.session_state.turn += 1
+        moves = {}
+        transfers = [[] for _ in st.session_state.nodes]
+
+        # Gate 1 releases aircraft
+        gate1 = st.session_state.nodes[0]
+        if match_io_rule:
+            release_count = st.session_state.last_output
+        else:
+            release_count = gate1.last_roll
+        for _ in range(release_count):
+            gate1.queue.append("Aircraft")
+        moves[gate1.name] = f"Released {release_count}"
+
+        # Decide movements
+        gc2_to_gate2 = 0
+        for i in range(len(st.session_state.nodes) - 1):
+            node = st.session_state.nodes[i]
+            next_node = st.session_state.nodes[i + 1]
+
+            if len(node.queue) > 0:
+                capacity = node.last_roll
+                moved = min(capacity, len(node.queue))
+                for _ in range(moved):
+                    ac = node.queue.popleft()
+                    transfers[i + 1].append(ac)
+                moves[node.name] = f"Will move {moved} forward"
+
+                if node.name == "Ground Controller 2":
+                    gc2_to_gate2 = moved
+            else:
+                moves[node.name] = "No aircraft to move"
+
+        # Apply movements
+        for i, incoming in enumerate(transfers):
+            for ac in incoming:
+                st.session_state.nodes[i].queue.append(ac)
+
+        # Save GC2 -> Gate 2 output
+        st.session_state.last_output = gc2_to_gate2
+
+        # Store results
+        st.session_state.moves = moves
 
 # -----------------------------
 # Display Queues + Dice Rolls
@@ -187,3 +243,4 @@ if st.session_state.moves:
 
     if match_io_rule:
         st.info(f"Gate 1 matched last turn's Ground Controller 2 → Gate 2 output: {st.session_state.last_output}")
+
