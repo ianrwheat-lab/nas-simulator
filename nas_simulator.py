@@ -235,6 +235,18 @@ st.write("### Current System State")
 st.dataframe(df, use_container_width=True)
 
 # -----------------------------
+# Display WIP + TMI Counts
+# -----------------------------
+# WIP: sum of all queues except Gate 2
+wip_count = sum(len(node) for node in st.session_state.nodes if node.name != "Gate 2 (Completed Flights)")
+
+# TMI: sum of all nodes' special dice usage
+tmi_count = sum(node.special_count for node in st.session_state.nodes if node.name != "Gate 2 (Completed Flights)")
+
+st.metric("WIP Count", wip_count)
+st.metric("TMI Count", tmi_count)
+
+# -----------------------------
 # Display Turn Results (after system state)
 # -----------------------------
 if st.session_state.moves:
@@ -243,4 +255,5 @@ if st.session_state.moves:
 
     if match_io_rule:
         st.info(f"Gate 1 matched last turn's Ground Controller 2 → Gate 2 output: {st.session_state.last_output}")
+
 
