@@ -146,15 +146,15 @@ if st.button("Move Aircraft"):
         for ac in incoming:
             st.session_state.nodes[i].queue.append(ac)
 
-    # Real-time Gate 1 release
+    # Real-time Ground Controller 1 release
     gate1 = st.session_state.nodes[0]
     if match_io_rule:
-        release_count = gc2_to_gate2
+        release_count = gc2_to_gc1
         for _ in range(release_count):
-            gate1.queue.append("Aircraft")
-        moves[gate1.name] = f"Released {release_count} (matched GC2->Gate2 this turn)"
+            gc1.queue.append("Aircraft")
+        moves[gc1.name] = f"Released {release_count} (matched GC2->Gate2 this turn)"
     else:
-        release_count = gate1.last_roll
+        release_count = gc1.last_roll
         for _ in range(release_count):
             gate1.queue.append("Aircraft")
         moves[gate1.name] = f"Released {release_count} (by dice)"
@@ -249,3 +249,4 @@ st.metric("TMI Count", tmi_count)
 if st.session_state.moves:
     st.write(f"### Turn {st.session_state.turn} Results")
     st.write(st.session_state.moves)
+
