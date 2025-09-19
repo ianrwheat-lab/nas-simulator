@@ -21,7 +21,7 @@ class Node:
         if len(self.queue) >= threshold:
             # Congested: use special dice [1,2,3,4,4,4]
             for _ in range(self.dice):
-                self.last_roll += random.choice([1, 2, 3, 4, 4, 4])
+                self.last_roll += random.choice([1, 2, 3, 4, 5, 5])
             self.special_count += 1  # increment counter
         else:
             # Normal: use standard 1–6 dice
@@ -255,5 +255,6 @@ if st.session_state.moves:
 
     if match_io_rule:
         st.info(f"Gate 1 matched last turn's Ground Controller 2 → Gate 2 output: {st.session_state.last_output}")
+
 
 
