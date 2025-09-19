@@ -101,14 +101,15 @@ for name in node_names:
             key=f"start_{name}"
         )
 
-# Initialize nodes if empty or structure changed
+# Initialize nodes only if empty or structure changed
 if not st.session_state.nodes or len(st.session_state.nodes) != len(node_names):
     st.session_state.nodes = [Node(name) for name in node_names]
-# Preload chosen number of aircraft at each node (except Gate 1 and Gate 2)
-for node in st.session_state.nodes:
-    if node.name in start_values:
-        for _ in range(start_values[node.name]):
-            node.queue.append("Aircraft")
+
+    # Preload aircraft at the start ONLY ON RESET/INIT
+    for node in st.session_state.nodes:
+        if node.name in start_values:
+            for _ in range(start_values[node.name]):
+                node.queue.append("Aircraft")
 
 # Dice controls for each node (except completed Gate 2)
 for node in st.session_state.nodes[:-1]:
@@ -270,3 +271,4 @@ if st.session_state.moves:
 
     if match_io_rule:
         st.info(f"Gate 1 matched last turn's Ground Controller 2 → Gate 2 output: {st.session_state.last_output}")
+
