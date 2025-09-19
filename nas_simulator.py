@@ -120,15 +120,6 @@ if st.button("Move Aircraft"):
     # Temporary storage for movements
     transfers = [[] for _ in st.session_state.nodes]
 
-    # Gate 1 releases aircraft
-    gate1 = st.session_state.nodes[0]
-    if match_io_rule:
-        release_count = st.session_state.last_output
-    else:
-        release_count = gate1.last_roll
-    for _ in range(release_count):
-        gate1.queue.append("Aircraft")
-    moves[gate1.name] = f"Released {release_count}"
 
     # Decide movements (but don’t apply yet)
     gc2_to_gate2 = 0  # track Ground Controller 2 -> Gate 2 this turn
@@ -155,11 +146,25 @@ if st.button("Move Aircraft"):
         for ac in incoming:
             st.session_state.nodes[i].queue.append(ac)
 
-    # Save GC2 -> Gate 2 output for next turn
-    st.session_state.last_output = gc2_to_gate2
+# Handle Gate 1 release AFTER GC2 output is known
+if match_io_rule:
+    release_count = gc2_to_gate2
+    target_node = st.session_state.nodes[1]  # Ground Controller 1
+    for _ in range(release_count):
+        target_node.queue.append("Aircraft")
+    moves["Gate 1"] = f"Sent {release_count} directly to Ground Controller 1"
+else:
+    gate1 = st.session_state.nodes[0]
+    release_count = gate1.last_roll
+    for _ in range(release_count):
+        gate1.queue.append("Aircraft")
+    moves[gate1.name] = f"Released {release_count}"
 
-    # Store results in session state
-    st.session_state.moves = moves
+# Save GC2 -> Gate 2 output for reference
+st.session_state.last_output = gc2_to_gate2
+
+# Store results in session state
+st.session_state.moves = moves
     
 # -----------------------------
 # Simulation Step: Auto Run
@@ -255,4 +260,5 @@ if st.session_state.moves:
 
     if match_io_rule:
         st.info(f"Gate 1 matched last turn's Ground Controller 2 → Gate 2 output: {st.session_state.last_output}")
+
 
